@@ -1,5 +1,6 @@
 package frontend.panels;
 
+import frontend.renders.ColoredTreeCellRenderer;
 import backend.model.Topic;
 import backend.service.StudyPlannerService;
 import javax.swing.*;
