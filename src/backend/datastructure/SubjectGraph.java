@@ -9,7 +9,7 @@ import java.util.*;
  */
 public class SubjectGraph {
     private Map<String, Subject> subjects;
-    private Map<String, List<String>> adjacencyList; // prerequisite -> list of subjects that need it
+    private Map<String, List<String>> adjacencyList; 
     
     public SubjectGraph() {
         subjects = new HashMap<>();
@@ -28,75 +28,76 @@ public class SubjectGraph {
             adjacencyList.get(prerequisiteId).add(subjectId);
         }
     }
+
+    /**
+     * LOGIC UPGRADE: Check if adding a dependency creates a cycle.
+     * Returns true if safe to add, false if it creates a loop.
+     */
+    public boolean canAddDependency(String subjectId, String prerequisiteId) {
+        // If they are the same, it's a self-loop
+        if (subjectId.equals(prerequisiteId)) return false;
+
+        // Temporarily add edge
+        List<String> deps = adjacencyList.get(prerequisiteId);
+        if (deps == null) deps = new ArrayList<>();
+        deps.add(subjectId);
+        adjacencyList.put(prerequisiteId, deps);
+
+        // Check for cycle
+        boolean hasCycle = hasCycle();
+
+        // Remove edge (backtrack)
+        deps.remove(subjectId);
+
+        return !hasCycle;
+    }
     
     /**
      * Kahn's Algorithm for Topological Sorting
-     * Returns valid study order respecting prerequisites
      */
     public List<Subject> getTopologicalOrder() {
         Map<String, Integer> inDegree = new HashMap<>();
         
-        // Initialize in-degrees
-        for (String id : subjects.keySet()) {
-            inDegree.put(id, 0);
-        }
+        for (String id : subjects.keySet()) inDegree.put(id, 0);
         
-        // Calculate in-degrees
         for (List<String> edges : adjacencyList.values()) {
             for (String dest : edges) {
-                inDegree.put(dest, inDegree.get(dest) + 1);
+                inDegree.put(dest, inDegree.getOrDefault(dest, 0) + 1);
             }
         }
         
-        // Queue for BFS
         Queue<Subject> queue = new LinkedList<>();
         for (String id : subjects.keySet()) {
-            if (inDegree.get(id) == 0) {
-                queue.add(subjects.get(id));
-            }
+            if (inDegree.get(id) == 0) queue.add(subjects.get(id));
         }
         
         List<Subject> result = new ArrayList<>();
-        
+        int count = 0;
+
         while (!queue.isEmpty()) {
             Subject current = queue.poll();
             result.add(current);
+            count++;
             
-            // Reduce in-degree for neighbors
-            for (String neighbor : adjacencyList.get(current.getId())) {
-                int newDegree = inDegree.get(neighbor) - 1;
-                inDegree.put(neighbor, newDegree);
-                if (newDegree == 0) {
-                    queue.add(subjects.get(neighbor));
+            if (adjacencyList.containsKey(current.getId())) {
+                for (String neighbor : adjacencyList.get(current.getId())) {
+                    inDegree.put(neighbor, inDegree.get(neighbor) - 1);
+                    if (inDegree.get(neighbor) == 0) {
+                        queue.add(subjects.get(neighbor));
+                    }
                 }
             }
         }
         
-        return result;
-    }
-    
-    public List<Subject> getPrerequisites(String subjectId) {
-        List<Subject> prereqs = new ArrayList<>();
-        for (Map.Entry<String, List<String>> entry : adjacencyList.entrySet()) {
-            if (entry.getValue().contains(subjectId)) {
-                prereqs.add(subjects.get(entry.getKey()));
-            }
-        }
-        return prereqs;
+        // If count != subjects.size(), there is a cycle (or disconnected parts in cycle)
+        return count == subjects.size() ? result : new ArrayList<>(); // Return empty if cycle detected
     }
     
     public boolean hasCycle() {
+        // If topological sort returns fewer nodes than exist, we have a cycle
         return getTopologicalOrder().size() != subjects.size();
     }
     
     public Map<String, Subject> getSubjects() { return subjects; }
     public Map<String, List<String>> getAdjacencyList() { return adjacencyList; }
-    
-    public void removeSubject(String id) {
-        subjects.remove(id);
-        adjacencyList.remove(id);
-        for (List<String> list : adjacencyList.values()) {
-            list.remove(id);
-        }
-    }
 }
